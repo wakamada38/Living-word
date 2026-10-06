@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#453b8c">
+<title>Living Word</title>
+<link rel="manifest" href="manifest.webmanifest">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+:root{--bg:#191a2e;--card:#252549;--field:#1a1a35;--accent:#7c5cff;--tab:#2a2a55;--text:#ececf6;--muted:#9a9ab8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,system-ui,sans-serif;padding-bottom:40px}
+header{background:#453b8c;text-align:center;padding:18px 12px 14px}
+header h1{margin:0;font-size:1.8rem}
+header p{margin:4px 0 0;color:#c9c4ee}
+nav{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:18px 8px 6px}
+nav button{background:var(--tab);color:var(--text);border:0;border-radius:10px;padding:12px 16px;font-size:1.05rem}
+nav button.on{background:var(--accent)}
+.card{background:var(--card);border-radius:18px;margin:16px 14px;padding:20px}
+.card h2{margin:0 0 6px;font-size:1.6rem}
+.hint{color:var(--muted);margin:0 0 12px}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:14px 22px;font-size:1.1rem;margin:0 8px 8px 0}
+.btn.rec{background:#d6336c}
+input,textarea{width:100%;background:var(--field);color:var(--text);border:0;border-radius:10px;padding:14px;font:inherit;margin-bottom:12px}
+textarea{resize:vertical;min-height:120px}
+#tx{background:var(--field);border-radius:10px;min-height:190px;padding:14px;line-height:1.5;overflow-wrap:anywhere}
+#tx i{color:var(--muted)}
+.ref{color:#b9a8ff;text-decoration:underline;background:none;border:0;font:inherit;padding:0}
+.v,.n{background:var(--field);border-radius:10px;padding:12px 14px;margin-top:10px}
+.v b,.n b{color:#b9a8ff}
+.v p,.n p{margin:6px 0 0;line-height:1.5;white-space:pre-wrap}
+.x{float:right;background:none;border:0;color:var(--muted);font-size:1.1rem}
+.empty{color:var(--muted)}
+.view{display:none}.view.on{display:block}
+select{background:var(--field);color:var(--text);border:0;border-radius:10px;padding:12px;font:inherit;max-width:100%}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.bar select:first-child{flex:1 1 150px}
+.bvs{line-height:1.7;margin:0 0 6px;padding:4px 6px;border-radius:8px}
+.bvs sup{color:#b9a8ff;margin-right:5px;font-weight:700}
+.bvs.s{background:#34346a}
+#bh{margin:4px 0 10px}
+.pill{display:inline-block;margin-top:8px;background:#34346a;color:#ececf6;border-radius:99px;padding:4px 12px;font-size:.85rem}
+:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+</head>
+<body>
+<header><h1>📖 Living Word</h1><p>Sermon transcription • Scripture linking • Notes</p>
+<span id="st" class="pill" role="status">💾 Saved on this phone</span></header>
+<nav>
+  <button class="on" data-t="t">Transcribe</button>
+  <button data-t="b">Bible</button>
+  <button data-t="v">Verses</button>
+  <button data-t="n">Notes</button>
+</nav>
+
+<section class="view on" id="t">
+  <div class="card">
+    <h2>🎙️ Live Transcription</h2>
+    <p class="hint">Click record and speak — Bible references (e.g. "John 3:16") are auto-detected and linked.</p>
+    <button class="btn" id="rec">► Start Recording</button><button class="btn" id="clr">🗑️ Clear</button><select id="lang" aria-label="Language" style="margin-bottom:8px"><option value="en">English</option><option value="sw">Kiswahili</option></select>
+    <div id="tx" aria-live="polite"></div>
+  </div>
+  <div class="card">
+    <h2>✝️ Linked Verses</h2>
+    <input id="q" placeholder="Or look up a verse, e.g. Psalm 23:1" enterkeyhint="search">
+    <button class="btn" id="go">Look Up</button>
+    <div id="lv"><p class="empty">No verses yet.</p></div>
+  </div>
+  <div class="card">
+    <h2>📝 Sermon Notes</h2>
+    <input id="title" placeholder="Sermon title">
+    <textarea id="body" placeholder="Your notes..."></textarea>
+    <button class="btn" id="save">💾 Save Note</button>
+  </div>
+</section>
+
+<section class="view" id="b"><div class="card">
+  <h2>📖 Bible</h2>
+  <p class="hint">Pick a book and chapter. Tap a verse to save it to your Verses tab.</p>
+  <div class="bar"><select id="bb" aria-label="Book"></select><select id="bc" aria-label="Chapter"></select><select id="bt" aria-label="Translation"><option value="kjv">KJV</option><option value="web">WEB</option><option value="bbe">BBE</option></select></div>
+  <button class="btn" id="bp">◀ Previous</button><button class="btn" id="bn">Next ▶</button>
+  <h3 id="bh"></h3><div id="bv"></div>
+</div></section>
+
+<section class="view" id="v"><div class="card"><h2>✝️ Saved Verses</h2><div id="sv"></div></div></section>
+<section class="view" id="n"><div class="card"><h2>📝 Saved Notes</h2><div id="sn"></div></div></section>
+
+<script>
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+let verses=store.get('lw_verses',[]),notes=store.get('lw_notes',[]),lang=store.get('lw_lang','en');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* tabs */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));
+});
+
+/* reference detection (English + Kiswahili) */
+let RE,NAMEMAP={};
+const NUM={first:'1',second:'2',third:'3',kwanza:'1',pili:'2',tatu:'3'};
+function findRefs(text){
+  const out=[];let m;RE.lastIndex=0;
+  while((m=RE.exec(text))){
+    const n=m[1]?(NUM[m[1].toLowerCase()]||m[1]):(m[3]?NUM[m[3].toLowerCase()]:'');
+    const i=NAMEMAP[(n?n+' ':'')+m[2].toLowerCase()];
+    if(i===undefined)continue;
+    out.push({ref:BK[i][0]+' '+m[4]+(m[5]?':'+m[5]+(m[6]?'-'+m[6]:''):''),start:m.index,end:m.index+m[0].length});
+  }
+  return out;
+}
+
+/* verse lookup: Kiswahili when language is Kiswahili, otherwise KJV */
+function swId(){
+  if(tsel.value.startsWith('h:'))return tsel.value.slice(2);
+  const l=store.get('lw_sw',{list:[]}).list;return l.length?l[0].id:null;
+}
+async function lookup(ref,quiet){
+  const box=$('lv');
+  if(!quiet)box.innerHTML='<p class="empty">Looking up '+esc(ref)+'…</p>';
+  const m=ref.match(/^(.+?) (\d+)(?::(\d+)(?:-(\d+))?)?$/);
+  const bi=m?BK.findIndex(b=>b[0]===m[1]):-1;
+  try{
+    const id=swId();
+    if(lang==='sw'&&bi>=0&&id){
+      try{
+        const r=await fetch('https://bible.helloao.org/api/'+id+'/'+USFM[bi]+'/'+m[2]+'.simple.json');
+        if(r.ok){
+          const d=await r.json();
+          let vs=d.chapter.content.filter(x=>x.type==='verse');
+          if(m[3]){const a=+m[3],z=+(m[4]||m[3]);vs=vs.filter(x=>x.number>=a&&x.number<=z)}
+          if(vs.length){
+            const o=tsel.querySelector('option[value="h:'+id+'"]');
+            addVerse(SW[bi]+' '+m[2]+(m[3]?':'+m[3]+(m[4]?'-'+m[4]:''):''),vs.map(x=>(vs.length>1?x.number+' ':'')+String(x.text||'').trim()).join(' '),(o&&o.dataset.lab)||'Swahili');
+            return;
+          }
+        }
+      }catch(e){}
+    }
+    const r=await fetch('https://bible-api.com/'+encodeURIComponent(ref)+'?translation=kjv');
+    if(!r.ok)throw 0;
+    const d=await r.json();
+    if(!d.text)throw 0;
+    addVerse(d.reference,d.text.trim());
+  }catch(e){
+    if(!quiet)box.innerHTML='<p class="empty">Could not find "'+esc(ref)+'". Check the spelling and your internet connection.</p>';
+  }
+}
+let session=[];
+const key=v=>v.ref+'|'+(v.tr||'KJV');
+function addVerse(ref,text,tr){
+  const v={ref,text,tr:tr||'KJV',ts:Date.now()};v.id=vid(v);
+  if(!session.find(x=>key(x)===key(v)))session.unshift(v);
+  if(!verses.find(x=>key(x)===key(v))){verses.unshift(v);store.set('lw_verses',verses);cloudSet('v',v)}
+  renderVerses();
+}
+function vhtml(v,del){return '<div class="v">'+(del?'<button class="x" data-k="'+esc(key(v))+'" aria-label="Delete verse">✕</button>':'')+'<b>'+esc(v.ref)+'</b> ('+esc(v.tr||'KJV')+')<p>'+esc(v.text)+'</p></div>'}
+function renderVerses(){
+  $('lv').innerHTML=session.length?session.map(v=>vhtml(v)).join(''):'<p class="empty">No verses yet.</p>';
+  $('sv').innerHTML=verses.length?verses.map(v=>vhtml(v,1)).join(''):'<p class="empty">Verses you look up or hear in a sermon are saved here.</p>';
+}
+$('sv').onclick=e=>{const r=e.target.dataset.k;if(r){const x=verses.find(v=>key(v)===r);verses=verses.filter(v=>key(v)!==r);store.set('lw_verses',verses);renderVerses();if(x)cloudDel('v',x.id||vid(x))}};
+$('go').onclick=()=>{const q=$('q').value.trim();if(q){const f=findRefs(q)[0];lookup(f?f.ref:q);$('q').value=''}};
+$('q').onkeydown=e=>{if(e.key==='Enter')$('go').click()};
+
+/* transcription */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null,on=false,finalText='',seen=new Set();
+function renderTx(interim){
+  const refs=findRefs(finalText);let html='',i=0;
+  refs.forEach(r=>{html+=esc(finalText.slice(i,r.start))+'<button class="ref" data-ref="'+esc(r.ref)+'">'+esc(finalText.slice(r.start,r.end))+'</button>';i=r.end});
+  html+=esc(finalText.slice(i));
+  if(interim)html+=' <i>'+esc(interim)+'</i>';
+  $('tx').innerHTML=html;
+  $('tx').scrollTop=$('tx').scrollHeight;
+}
+$('tx').onclick=e=>{const r=e.target.dataset.ref;if(r)lookup(r)};
+$('rec').onclick=()=>{
+  if(!SR){$('tx').innerHTML='<i>Speech recognition is not supported in this browser. Open the app in Chrome on Android.</i>';return}
+  if(on){on=false;rec.stop();return}
+  rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang=lang==='sw'?'sw-KE':'en-US';
+  rec.onresult=ev=>{
+    let interim='';
+    for(let i=ev.resultIndex;i<ev.results.length;i++){
+      const t=ev.results[i][0].transcript;
+      if(ev.results[i].isFinal){
+        finalText+=(finalText?' ':'')+t.trim();
+        findRefs(t).forEach(r=>{if(!seen.has(r.ref)){seen.add(r.ref);lookup(r.ref,true)}});
+      }else interim+=t;
+    }
+    renderTx(interim);
+  };
+  rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){on=false;$('tx').innerHTML='<i>Microphone access was blocked. Allow the microphone for this site and try again.</i>'}};
+  rec.onend=()=>{if(on){try{rec.start()}catch(e){}}else{$('rec').textContent='► Start Recording';$('rec').classList.remove('rec')}};
+  on=true;rec.start();$('rec').textContent='■ Stop Recording';$('rec').classList.add('rec');
+};
+$('clr').onclick=()=>{finalText='';seen.clear();renderTx('')};
+
+/* notes */
+function renderNotes(){
+  $('sn').innerHTML=notes.length?notes.map((n,i)=>'<div class="n"><button class="x" data-i="'+i+'" aria-label="Delete note">✕</button><b>'+esc(n.title||'Untitled sermon')+'</b> <small class="empty">'+esc(n.date)+'</small><p>'+esc(n.body)+'</p></div>').join(''):'<p class="empty">No notes yet. Write one on the Transcribe tab and tap Save Note.</p>';
+}
+$('sn').onclick=e=>{const i=e.target.dataset.i;if(i!==undefined){const n=notes[+i];notes.splice(+i,1);store.set('lw_notes',notes);renderNotes();if(n)cloudDel('n',n.id)}};
+$('save').onclick=()=>{
+  const title=$('title').value.trim(),body=$('body').value.trim();
+  if(!title&&!body){$('body').focus();return}
+  const nt={id:uid(),title,body,date:new Date().toLocaleDateString(),ts:Date.now()};notes.unshift(nt);cloudSet('n',nt);
+  store.set('lw_notes',notes);$('title').value='';$('body').value='';renderNotes();
+  $('save').textContent='✅ Saved';setTimeout(()=>$('save').textContent='💾 Save Note',1500);
+};
+
+renderVerses();renderNotes();
+
+/* Bible reader */
+const BK=[["Genesis",50],["Exodus",40],["Leviticus",27],["Numbers",36],["Deuteronomy",34],["Joshua",24],["Judges",21],["Ruth",4],["1 Samuel",31],["2 Samuel",24],["1 Kings",22],["2 Kings",25],["1 Chronicles",29],["2 Chronicles",36],["Ezra",10],["Nehemiah",13],["Esther",10],["Job",42],["Psalms",150],["Proverbs",31],["Ecclesiastes",12],["Song of Solomon",8],["Isaiah",66],["Jeremiah",52],["Lamentations",5],["Ezekiel",48],["Daniel",12],["Hosea",14],["Joel",3],["Amos",9],["Obadiah",1],["Jonah",4],["Micah",7],["Nahum",3],["Habakkuk",3],["Zephaniah",3],["Haggai",2],["Zechariah",14],["Malachi",4],["Matthew",28],["Mark",16],["Luke",24],["John",21],["Acts",28],["Romans",16],["1 Corinthians",16],["2 Corinthians",13],["Galatians",6],["Ephesians",6],["Philippians",4],["Colossians",4],["1 Thessalonians",5],["2 Thessalonians",3],["1 Timothy",6],["2 Timothy",4],["Titus",3],["Philemon",1],["Hebrews",13],["James",5],["1 Peter",5],["2 Peter",3],["1 John",5],["2 John",1],["3 John",1],["Jude",1],["Revelation",22]];
+const bsel=$('bb'),csel=$('bc'),tsel=$('bt');
+BK.forEach((b,i)=>bsel.add(new Option(b[0],i)));
+const SW=["Mwanzo","Kutoka","Walawi","Hesabu","Kumbukumbu la Torati","Yoshua","Waamuzi","Ruthu","1 Samweli","2 Samweli","1 Wafalme","2 Wafalme","1 Mambo ya Nyakati","2 Mambo ya Nyakati","Ezra","Nehemia","Esta","Ayubu","Zaburi","Mithali","Mhubiri","Wimbo Ulio Bora","Isaya","Yeremia","Maombolezo","Ezekieli","Danieli","Hosea","Yoeli","Amosi","Obadia","Yona","Mika","Nahumu","Habakuki","Sefania","Hagai","Zekaria","Malaki","Mathayo","Marko","Luka","Yohana","Matendo ya Mitume","Warumi","1 Wakorintho","2 Wakorintho","Wagalatia","Waefeso","Wafilipi","Wakolosai","1 Wathesalonike","2 Wathesalonike","1 Timotheo","2 Timotheo","Tito","Filemoni","Waebrania","Yakobo","1 Petro","2 Petro","1 Yohana","2 Yohana","3 Yohana","Yuda","Ufunuo wa Yohana"];
+function initRefs(){
+  const bases=new Set();
+  const add=(n,i)=>{const l=n.toLowerCase();NAMEMAP[l]=i;bases.add(l.replace(/^\d\s/,''))};
+  BK.forEach((b,i)=>{add(b[0],i);add(SW[i],i)});
+  [['psalm',18],['song of songs',21],['matendo',43],['ufunuo',65],['kumbukumbu',4],['revelations',65]].forEach(x=>add(x[0],x[1]));
+  const list=[...bases].sort((a,b)=>b.length-a.length).map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+  RE=new RegExp("\\b(?:(1|2|3|first|second|third)\\s+)?("+list.join('|')+")(?:\\s+wa\\s+(kwanza|pili|tatu))?\\s+(?:(?:sura|chapter)\\s+(?:ya\\s+)?)?(\\d{1,3})(?:\\s*(?::|mstari(?:\\s+wa)?|aya(?:\\s+ya)?|verses?|\\bv\\b)\\s*(\\d{1,3})(?:\\s*(?:-|–|to|hadi|mpaka)\\s*(\\d{1,3}))?)?","gi");
+}
+initRefs();
+function nameBooks(){[...bsel.options].forEach((o,i)=>o.text=lang==='sw'?SW[i]:BK[i][0])}
+$('lang').value=lang;nameBooks();
+$('lang').onchange=()=>{
+  lang=$('lang').value;store.set('lw_lang',lang);nameBooks();readCh();
+  if(rec){rec.lang=lang==='sw'?'sw-KE':'en-US';if(on)rec.stop()}
+};
+
+function fillCh(c){csel.innerHTML='';for(let i=1;i<=BK[bsel.value][1];i++)csel.add(new Option(i,i));csel.value=c||1}
+const USFM="GEN EXO LEV NUM DEU JOS JDG RUT 1SA 2SA 1KI 2KI 1CH 2CH EZR NEH EST JOB PSA PRO ECC SNG ISA JER LAM EZK DAN HOS JOL AMO OBA JON MIC NAM HAB ZEP HAG ZEC MAL MAT MRK LUK JHN ACT ROM 1CO 2CO GAL EPH PHP COL 1TH 2TH 1TI 2TI TIT PHM HEB JAS 1PE 2PE 1JN 2JN 3JN JUD REV".split(' ');
+let curTr='KJV',bibleFailed=false;
+async function readCh(){
+  const b=+bsel.value,c=+csel.value,t=tsel.value,name=BK[b][0],bn=lang==='sw'?SW[b]:BK[b][0],opt=tsel.selectedOptions[0];
+  curTr=(opt&&(opt.dataset.lab||opt.text))||'KJV';
+  store.set('lw_pos',{b,c,t});
+  $('bh').textContent=bn+' '+c;
+  $('bv').innerHTML='<p class="empty">Loading…</p>';
+  try{
+    let vs;
+    if(t.startsWith('h:')){
+      const r=await fetch('https://bible.helloao.org/api/'+t.slice(2)+'/'+USFM[b]+'/'+c+'.simple.json');
+      if(!r.ok)throw 1;
+      const d=await r.json();
+      vs=d.chapter.content.filter(x=>x.type==='verse').map(x=>({verse:x.number,text:String(x.text||'')}));
+      if(!vs.length)throw 1;
+    }else{
+      const r=await fetch('https://bible-api.com/'+encodeURIComponent(name+' '+c)+'?translation='+t);
+      if(!r.ok)throw 0;
+      vs=(await r.json()).verses;
+    }
+    bibleFailed=false;$('bv').innerHTML=vs.map(v=>{const ref=bn+' '+c+':'+v.verse,tx=v.text.trim();return '<p class="bvs'+(verses.find(x=>key(x)===ref+'|'+curTr)?' s':'')+'" data-ref="'+esc(ref)+'" data-t="'+esc(tx)+'"><sup>'+v.verse+'</sup>'+esc(tx)+'</p>'}).join('');
+  }catch(e){bibleFailed=true;$('bv').innerHTML='<p class="empty">Could not load this chapter. Check your internet connection. This translation may also not include this book. Chapters you have read before open offline.</p>'}
+}
+function step(d){
+  let b=+bsel.value,c=+csel.value+d;
+  if(c<1){if(b===0)return;b--;c=BK[b][1]}
+  else if(c>BK[b][1]){if(b===BK.length-1)return;b++;c=1}
+  bsel.value=b;fillCh(c);readCh();window.scrollTo(0,0);
+}
+bsel.onchange=()=>{fillCh(1);readCh()};csel.onchange=readCh;tsel.onchange=readCh;
+$('bp').onclick=()=>step(-1);$('bn').onclick=()=>step(1);
+$('bv').onclick=e=>{
+  const p=e.target.closest('.bvs');if(!p)return;
+  addVerse(p.dataset.ref,p.dataset.t,curTr);p.classList.add('s');
+};
+function swOptions(list){
+  tsel.querySelectorAll('option[data-sw]').forEach(o=>o.remove());
+  list.forEach(t=>{const o=new Option('Swahili – '+t.englishName,'h:'+t.id);o.dataset.sw=1;o.dataset.lab='Swahili '+(t.shortName||'');tsel.add(o)});
+}
+async function loadSw(){
+  const c=store.get('lw_sw',{at:0,list:[]});
+  swOptions(c.list);
+  if(c.list.length&&Date.now()-c.at<2592e6)return;
+  try{
+    const r=await fetch('https://bible.helloao.org/api/available_translations.json');
+    const d=await r.json();
+    const list=d.translations.filter(t=>(t.language==='swh'||t.language==='swa'||/swahili/i.test(t.languageEnglishName||''))&&t.numberOfBooks>=27).map(t=>({id:t.id,englishName:t.englishName,shortName:t.shortName}));
+    store.set('lw_sw',{at:Date.now(),list});
+    const cur=tsel.value;swOptions(list);tsel.value=cur;
+  }catch(e){}
+}
+swOptions(store.get('lw_sw',{list:[]}).list);
+(()=>{const p=store.get('lw_pos',{b:42,c:1,t:'kjv'});bsel.value=p.b;fillCh(p.c);tsel.value=p.t;readCh();loadSw()})();
+/* Firebase live sync (offline-first: phone copy always works, cloud catches up) */
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const vid=v=>encodeURIComponent(key(v)).replace(/[%.]/g,'_').slice(0,200);
+const FB=window.LW_FB||{},COL={n:FB.notesCollection||'lw_notes',v:FB.versesCollection||'lw_verses'};
+let db=null,pend={n:false,v:false},cloudErr=false;
+function setStatus(){
+  $('st').textContent=!db?'💾 Saved on this phone':cloudErr?'⚠️ Cloud blocked by rules – saved on phone':!navigator.onLine?'📴 Offline – saving on phone':(pend.n||pend.v)?'🔄 Syncing…':'☁️ Live & synced';
+}
+function fail(e){if(e&&e.code==='permission-denied'){cloudErr=true;setStatus()}}
+function cloudSet(k,o){if(db)db.collection(COL[k]).doc(o.id).set(o).catch(fail)}
+function cloudDel(k,id){if(db&&id)db.collection(COL[k]).doc(id).delete().catch(fail)}
+function listen(k,get,put,render,ls){
+  db.collection(COL[k]).orderBy('ts','desc').onSnapshot({includeMetadataChanges:true},snap=>{
+    cloudErr=false;pend[k]=snap.metadata.hasPendingWrites;
+    if(!(snap.metadata.fromCache&&snap.empty&&get().length)){
+      put(snap.docs.map(d=>Object.assign({},d.data(),{id:d.id})));store.set(ls,get());render();
+    }
+    setStatus();
+  },fail);
+}
+function initCloud(){
+  notes.forEach((n,i)=>{n.id=n.id||uid();n.ts=n.ts||Date.now()-i});
+  verses.forEach((v,i)=>{v.tr=v.tr||'KJV';v.id=v.id||vid(v);v.ts=v.ts||Date.now()-i});
+  store.set('lw_notes',notes);store.set('lw_verses',verses);
+  const c=FB.config;
+  if(!window.firebase||!c||!c.apiKey||/^PASTE/.test(c.apiKey)){setStatus();return}
+  try{
+    firebase.initializeApp(c);
+    db=firebase.firestore();
+    db.settings({experimentalAutoDetectLongPolling:true});
+    db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+  }catch(e){db=null;setStatus();return}
+  if(!store.get('lw_migrated',0)){
+    const b=db.batch();
+    notes.forEach(n=>b.set(db.collection(COL.n).doc(n.id),n));
+    verses.forEach(v=>b.set(db.collection(COL.v).doc(v.id),v));
+    b.commit().catch(fail);store.set('lw_migrated',1);
+  }
+  listen('n',()=>notes,a=>{notes=a},renderNotes,'lw_notes');
+  listen('v',()=>verses,a=>{verses=a},renderVerses,'lw_verses');
+  setStatus();
+}
+initCloud();
+
+/* network back: reconnect, retry what failed, check for a new app version */
+let swReg=null;
+addEventListener('online',()=>{
+  if(db)db.enableNetwork().catch(()=>{});
+  setStatus();if(bibleFailed)readCh();loadSw();
+  if(swReg)swReg.update().catch(()=>{});
+});
+addEventListener('offline',setStatus);
+if('serviceWorker' in navigator){
+  const had=!!navigator.serviceWorker.controller;let rl=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!rl&&!on){rl=true;location.reload()}});
+  addEventListener('load',()=>navigator.serviceWorker.register('sw.js').then(r=>{swReg=r}).catch(()=>{}));
+}
+</script>
+</body>
+</html>
